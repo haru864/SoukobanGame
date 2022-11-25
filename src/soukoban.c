@@ -9,13 +9,19 @@ void print_player(void)
 	move(y, x);
 }
 
-int main(int argc, char **argv[])
+int main(int argc, char **argv)
 {
 	char c, c2;
 
 	initscr();
-	noecho();
+	// noecho();
+	echo();
 	cbreak();
+
+	c = getch();
+	mvaddch(10, 10, c);
+	refresh();
+	c = getch();
 
 	endwin();
 

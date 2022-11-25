@@ -1,5 +1,5 @@
 PROGRAM	=soukoban
-OBJS	=soukoban.co
+OBJS	=soukoban.o
 SRCS	=$(OBJS:%.o=%.c)
 CC		=gcc
 LD		=gcc
@@ -12,5 +12,14 @@ OBJPATH	=../bin/obj/
 all:$(PROGRAM)
 
 clean:
-	rm -rf $(BINPATH)$(PROGRAM)
+	rm -rf $(BINPATH)$(PROGRAM) $(OBJPATH)*.o
+
+$(PROGRAM):$(OBJS)
+	$(LD) $(OBJPATH)$(OBJS) -o $(BINPATH)$@ $(LDFLAGS)
+
+.c.o:
+	$(CC) $(CFLAGS) -c $< -o $(OBJPATH)$@
+
+demo:
+	$(BINPATH)$(PROGRAM)
 
