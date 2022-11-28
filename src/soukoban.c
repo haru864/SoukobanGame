@@ -79,10 +79,32 @@ static void step(int dy, int dx)
 	int new_y = y + dy, new_x = x + dx;
 	move(new_y, new_x);
 	c = inch() & A_CHARTEXT;
-	if (c == WALL || c == ROCK || c == PIT)
+
+	if (c == WALL || c == PIT)
 	{
 		return;
 	}
+	else if (c == ROCK)
+	{
+		move(y + dy + dy, x + dx + dx);
+		char dist = inch() & A_CHARTEXT;
+		move(20, 0);
+		printw("dist: %c", dist);
+		if (dist == WALL || dist == ROCK)
+		{
+			return;
+		}
+		else if (dist == PIT)
+		{
+			mvaddch(y + dy + dy, x + dx + dx, SPACE);
+			mvaddch(y + dy, x + dx, SPACE);
+		}
+		else if (dist == SPACE)
+		{
+			mvaddch(y + dy + dy, x + dx + dx, ROCK);
+		}
+	}
+
 	move(y, x);
 	addch(SPACE);
 	y += dy;
