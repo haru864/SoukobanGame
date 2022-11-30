@@ -22,7 +22,12 @@ enum
 	KB_DOWN = 's',
 	KB_LEFT = 'a',
 	KB_RIGHT = 'd',
+	KB_UP2 = 'W',
+	KB_DOWN2 = 'S',
+	KB_LEFT2 = 'A',
+	KB_RIGHT2 = 'D',
 	KB_QUIT = 'q',
+	KB_REFRESH = 'r',
 };
 
 static int y, x;
@@ -54,6 +59,7 @@ static void load_map(char *filename)
 		printw("%s", buf);
 	}
 
+	mvprintw(LINES - 1, 0, "%d rock(s) left", num);
 	fclose(fp);
 }
 
@@ -68,6 +74,13 @@ static void soukoban_init(char *filename)
 
 static void soukoban_end(void)
 {
+	clear();
+	if (num == 0)
+	{
+		mvprintw(1, 1, "Finish!");
+		mvprintw(2, 1, "Type any key to end: ");
+		getch();
+	}
 	clear();
 	refresh();
 	endwin();
@@ -88,8 +101,6 @@ static void step(int dy, int dx)
 	{
 		move(y + dy + dy, x + dx + dx);
 		char dist = inch() & A_CHARTEXT;
-		move(20, 0);
-		printw("dist: %c", dist);
 		if (dist == WALL || dist == ROCK)
 		{
 			return;
@@ -98,6 +109,8 @@ static void step(int dy, int dx)
 		{
 			mvaddch(y + dy + dy, x + dx + dx, SPACE);
 			mvaddch(y + dy, x + dx, SPACE);
+			num--;
+			mvprintw(LINES - 1, 0, "%d rock(s) left", num);
 		}
 		else if (dist == SPACE)
 		{
@@ -112,7 +125,20 @@ static void step(int dy, int dx)
 	mvaddch(y, x, PLAYER);
 }
 
-static void soukoban_main_loop(void)
+static void dash(int dy, int dx)
+{
+	while (1)
+	{
+		int prev_y = y, prev_x = x;
+		step(dy, dx);
+		if (y == prev_y && x == prev_x)
+		{
+			break;
+		}
+	}
+}
+
+static void soukoban_main_loop(char *filename)
 {
 	int c;
 	refresh();
@@ -133,6 +159,21 @@ static void soukoban_main_loop(void)
 		case KB_RIGHT:
 			step(0, 1);
 			break;
+		case KB_UP2:
+			dash(-1, 0);
+			break;
+		case KB_DOWN2:
+			dash(1, 0);
+			break;
+		case KB_LEFT2:
+			dash(0, -1);
+			break;
+		case KB_RIGHT2:
+			dash(0, 1);
+			break;
+		case KB_REFRESH:
+			soukoban_init(filename);
+			break;
 		default:
 			break;
 		}
@@ -151,7 +192,7 @@ int main(int argc, char **argv)
 	}
 
 	soukoban_init(filename);
-	soukoban_main_loop();
+	soukoban_main_loop(filename);
 	soukoban_end();
 
 	return 0;
