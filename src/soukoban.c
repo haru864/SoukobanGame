@@ -6,6 +6,12 @@
 
 #define DEFAULT_DAT_FILENAME "soukoban.map"
 #define BUF_SIZE 1024
+#define MAXIMUM_UNDO_STEPS 3
+#define SAFE_FREE(ptr) \
+	{                  \
+		free(ptr);     \
+		ptr = NULL;    \
+	}
 
 enum
 {
@@ -15,7 +21,6 @@ enum
 	PLAYER = '@',
 	SPACE = ' ',
 };
-
 enum
 {
 	KB_UP = 'w',
@@ -28,39 +33,49 @@ enum
 	KB_RIGHT2 = 'D',
 	KB_QUIT = 'q',
 	KB_REFRESH = 'r',
+	KB_UNDO = 'U',
+	KB_REPLAY = 'R',
 };
 
-static int y, x;
-static int num;
-
-static void load_map(char *filename)
+typedef struct MAP_LIST
 {
-	char buf[BUF_SIZE];
-	FILE *fp = fopen(filename, "r");
+	struct MAP_LIST *prev;
+	struct MAP_LIST *next;
+	char **map;
 
-	if (fgets(buf, sizeof(buf), fp) == NULL && ferror(fp) != 0)
+} map_list;
+
+static int y, x;
+static int number_of_rocks_left;
+static map_list *map_list_head;
+static map_list *map_list_tail;
+
+static void soukoban_init(char *);
+static void soukoban_main_loop(char *);
+static void soukoban_end(void);
+static void load_map(char *);
+static void step(int, int);
+static void dash(int, int);
+// --------in progress---------
+static void undo_save_progress(void);
+static void undo_do(void);
+static void undo_clear(void);
+static void debug(void);
+// ----------------------------
+
+int main(int argc, char **argv)
+{
+	char *filename = DEFAULT_DAT_FILENAME;
+	if (argc >= 2)
 	{
-		perror("fgets");
-		exit(1);
-	}
-	if (sscanf(buf, "y = %d, x = %d, num = %d", &y, &x, &num) == EOF)
-	{
-		perror("sscanf");
-		exit(1);
+		filename = argv[1];
 	}
 
-	for (int i = 0; i < LINES; i++)
-	{
-		if (fgets(buf, sizeof(buf), fp) == NULL)
-		{
-			break;
-		}
-		move(i, 0);
-		printw("%s", buf);
-	}
+	soukoban_init(filename);
+	soukoban_main_loop(filename);
+	soukoban_end();
 
-	mvprintw(LINES - 1, 0, "%d rock(s) left", num);
-	fclose(fp);
+	return 0;
 }
 
 static void soukoban_init(char *filename)
@@ -70,12 +85,44 @@ static void soukoban_init(char *filename)
 	cbreak();
 	load_map(filename);
 	move(y, x);
+	map_list_head = map_list_tail = NULL;
+	undo_save_progress;
+}
+
+static void load_map(char *filename)
+{
+	char buf[BUF_SIZE];
+	FILE *fp = fopen(filename, "r");
+
+	if (fgets(buf, sizeof(buf), fp) == NULL && ferror(fp) != 0)
+	{
+		perror("fgets");
+		exit(EXIT_FAILURE);
+	}
+	if (sscanf(buf, "y = %d, x = %d, rocks = %d", &y, &x, &number_of_rocks_left) == EOF)
+	{
+		perror("sscanf");
+		exit(EXIT_FAILURE);
+	}
+
+	for (int i = 0; i < LINES - 1; i++)
+	{
+		if (fgets(buf, sizeof(buf), fp) == NULL)
+		{
+			break;
+		}
+		move(i, 0);
+		printw("%s", buf);
+	}
+
+	mvprintw(LINES - 1, 0, "%d rock(s) left", number_of_rocks_left);
+	fclose(fp);
 }
 
 static void soukoban_end(void)
 {
 	clear();
-	if (num == 0)
+	if (number_of_rocks_left == 0)
 	{
 		mvprintw(1, 1, "Finish!");
 		mvprintw(2, 1, "Type any key to end: ");
@@ -88,6 +135,9 @@ static void soukoban_end(void)
 
 static void step(int dy, int dx)
 {
+	// save current map
+	undo_save_progress();
+
 	chtype c;
 	int new_y = y + dy, new_x = x + dx;
 	move(new_y, new_x);
@@ -109,8 +159,8 @@ static void step(int dy, int dx)
 		{
 			mvaddch(y + dy + dy, x + dx + dx, SPACE);
 			mvaddch(y + dy, x + dx, SPACE);
-			num--;
-			mvprintw(LINES - 1, 0, "%d rock(s) left", num);
+			number_of_rocks_left--;
+			mvprintw(LINES - 1, 0, "%d rock(s) left", number_of_rocks_left);
 		}
 		else if (dist == SPACE)
 		{
@@ -143,7 +193,7 @@ static void soukoban_main_loop(char *filename)
 	int c;
 	refresh();
 
-	while (num != 0 && (c = getch()) != KB_QUIT)
+	while (number_of_rocks_left != 0 && (c = getch()) != KB_QUIT)
 	{
 		switch (c)
 		{
@@ -179,21 +229,93 @@ static void soukoban_main_loop(char *filename)
 		}
 
 		move(y, x);
+		debug();
 		refresh();
 	}
 }
 
-int main(int argc, char **argv)
+static void undo_save_progress(void)
 {
-	char *filename = DEFAULT_DAT_FILENAME;
-	if (argc >= 2)
+	// copy current map
+	map_list *currentMapList = (map_list *)malloc(sizeof(map_list));
+
+	if (currentMapList == NULL)
 	{
-		filename = argv[1];
+		fprintf(stderr, "Out of memory");
+		exit(EXIT_FAILURE);
 	}
 
-	soukoban_init(filename);
-	soukoban_main_loop(filename);
-	soukoban_end();
+	currentMapList->prev = NULL;
+	currentMapList->next = NULL;
+	currentMapList->map = (char **)malloc(sizeof(char *) * LINES);
 
-	return 0;
+	if (currentMapList->map == NULL)
+	{
+		fprintf(stderr, "Out of memory");
+		exit(EXIT_FAILURE);
+	}
+
+	for (int i = 0; i < LINES - 1; i++)
+	{
+		char buf[COLS];
+		currentMapList->map[i] = (char *)malloc(sizeof(char) * COLS);
+
+		if (currentMapList->map[i] == NULL)
+		{
+			fprintf(stderr, "Out of memory");
+			exit(EXIT_FAILURE);
+		}
+
+		if (i == 0)
+		{
+			if (sprintf(buf, "y=%d, x=%d, rocks=%d", y, x, number_of_rocks_left) < 0)
+			{
+				perror("sprintf");
+				exit(EXIT_FAILURE);
+			}
+		}
+		else
+		{
+			mvinstr(i, 0, buf);
+		}
+
+		if (sprintf(currentMapList->map[i], buf) < 0)
+		{
+			perror("sprintf");
+			exit(EXIT_FAILURE);
+		}
+	}
+
+	// add current map to list
+	if (map_list_head == NULL)
+	{
+		map_list_head = map_list_tail = currentMapList;
+	}
+	else
+	{
+		map_list_tail->next = currentMapList;
+		currentMapList->prev = map_list_tail;
+		map_list_tail = currentMapList;
+	}
+}
+
+static void undo_do(void)
+{
+	if (!map_list_head || !map_list_tail)
+	{
+		return;
+	}
+}
+
+static void debug()
+{
+	if (!map_list_tail)
+	{
+		return;
+	}
+
+	for (int i = 0; i < 10; i++)
+	{
+		mvprintw(20 + i, 0, map_list_tail->map[i + 1]);
+	}
 }
