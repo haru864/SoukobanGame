@@ -33,7 +33,7 @@ enum
 	KB_RIGHT2 = 'D',
 	KB_QUIT = 'q',
 	KB_REFRESH = 'r',
-	KB_UNDO = 'U',
+	KB_UNDO = 'u',
 	KB_REPLAY = 'R',
 };
 
@@ -56,10 +56,10 @@ static void soukoban_end(void);
 static void load_map(char *);
 static void step(int, int);
 static void dash(int, int);
-// --------in progress---------
 static void undo_save_progress(void);
 static void undo_do(void);
-static void undo_clear(void);
+// --------in progress---------
+static void replay(void);
 static void debug(void);
 // ----------------------------
 
@@ -97,12 +97,13 @@ static void load_map(char *filename)
 	if (fgets(buf, sizeof(buf), fp) == NULL && ferror(fp) != 0)
 	{
 		perror("fgets");
-		exit(EXIT_FAILURE);
+		soukoban_end();
 	}
+
 	if (sscanf(buf, "y = %d, x = %d, rocks = %d", &y, &x, &number_of_rocks_left) == EOF)
 	{
 		perror("sscanf");
-		exit(EXIT_FAILURE);
+		soukoban_end();
 	}
 
 	for (int i = 0; i < LINES - 1; i++)
@@ -125,8 +126,13 @@ static void soukoban_end(void)
 	if (number_of_rocks_left == 0)
 	{
 		mvprintw(1, 1, "Finish!");
-		mvprintw(2, 1, "Type any key to end: ");
-		getch();
+		mvprintw(2, 1, "Type R-key to replay,");
+		mvprintw(3, 1, "others to end: ");
+		int key = getch();
+		if (key == 'r' || key == 'R')
+		{
+			replay();
+		}
 	}
 	clear();
 	refresh();
@@ -224,12 +230,18 @@ static void soukoban_main_loop(char *filename)
 		case KB_REFRESH:
 			soukoban_init(filename);
 			break;
+		case KB_UNDO:
+			undo_do();
+			break;
+		case KB_REPLAY:
+			// unimplemented yet
+			break;
 		default:
 			break;
 		}
 
 		move(y, x);
-		debug();
+		// debug();
 		refresh();
 	}
 }
@@ -242,7 +254,7 @@ static void undo_save_progress(void)
 	if (currentMapList == NULL)
 	{
 		fprintf(stderr, "Out of memory");
-		exit(EXIT_FAILURE);
+		soukoban_end();
 	}
 
 	currentMapList->prev = NULL;
@@ -252,42 +264,41 @@ static void undo_save_progress(void)
 	if (currentMapList->map == NULL)
 	{
 		fprintf(stderr, "Out of memory");
-		exit(EXIT_FAILURE);
+		soukoban_end();
 	}
 
-	for (int i = 0; i < LINES - 1; i++)
+	for (int i = 0; i < LINES; i++)
 	{
-		char buf[COLS];
 		currentMapList->map[i] = (char *)malloc(sizeof(char) * COLS);
 
 		if (currentMapList->map[i] == NULL)
 		{
 			fprintf(stderr, "Out of memory");
-			exit(EXIT_FAILURE);
+			soukoban_end();
 		}
+	}
 
-		if (i == 0)
-		{
-			if (sprintf(buf, "y=%d, x=%d, rocks=%d", y, x, number_of_rocks_left) < 0)
-			{
-				perror("sprintf");
-				exit(EXIT_FAILURE);
-			}
-		}
-		else
-		{
-			mvinstr(i, 0, buf);
-		}
+	if (sprintf(currentMapList->map[0], "y=%d, x=%d, rocks=%d", y, x, number_of_rocks_left) < 0)
+	{
+		perror("sprintf");
+		soukoban_end();
+	}
 
-		if (sprintf(currentMapList->map[i], buf) < 0)
+	for (int i = 0; i < LINES - 1; i++)
+	{
+		char buf[COLS];
+
+		mvinstr(i, 0, buf);
+
+		if (sprintf(currentMapList->map[i + 1], buf) < 0)
 		{
 			perror("sprintf");
-			exit(EXIT_FAILURE);
+			soukoban_end();
 		}
 	}
 
 	// add current map to list
-	if (map_list_head == NULL)
+	if (map_list_head == NULL || map_list_tail == NULL)
 	{
 		map_list_head = map_list_tail = currentMapList;
 	}
@@ -305,6 +316,27 @@ static void undo_do(void)
 	{
 		return;
 	}
+
+	if (sscanf(map_list_tail->map[0], "y = %d, x = %d, rocks = %d", &y, &x, &number_of_rocks_left) == EOF)
+	{
+		perror("sscanf");
+		soukoban_end();
+	}
+
+	for (int i = 0; i < LINES - 1; i++)
+	{
+		move(i, 0);
+		printw("%s", map_list_tail->map[i + 1]);
+	}
+
+	map_list *formerTail = map_list_tail;
+	map_list_tail = formerTail->prev;
+	SAFE_FREE(formerTail);
+}
+
+static void replay(void)
+{
+	
 }
 
 static void debug()
@@ -316,6 +348,9 @@ static void debug()
 
 	for (int i = 0; i < 10; i++)
 	{
-		mvprintw(20 + i, 0, map_list_tail->map[i + 1]);
+		mvprintw(20 + i, 0, map_list_tail->map[i]);
 	}
+
+	mvprintw(32, 0, "%p", map_list_head);
+	mvprintw(33, 0, "%p", map_list_tail);
 }
