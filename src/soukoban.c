@@ -1,6 +1,7 @@
 #include <curses.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <errno.h>
 #include <error.h>
 
@@ -58,8 +59,8 @@ static void step(int, int);
 static void dash(int, int);
 static void undo_save_progress(void);
 static void undo_do(void);
-// --------in progress---------
 static void replay(void);
+// --------in progress---------
 static void debug(void);
 // ----------------------------
 
@@ -336,7 +337,20 @@ static void undo_do(void)
 
 static void replay(void)
 {
-	
+	clear();
+	map_list *currentMapList = map_list_head;
+
+	while (currentMapList != NULL)
+	{
+		for (int i = 1; i < LINES; i++)
+		{
+			mvprintw(i - 1, 0, currentMapList->map[i]);
+		}
+
+		currentMapList = currentMapList->next;
+		refresh();
+		usleep(5 * 100 * 1000);
+	}
 }
 
 static void debug()
