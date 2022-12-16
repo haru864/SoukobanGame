@@ -16,12 +16,19 @@
 
 enum
 {
+	MANUAL,
+	AUTOMATIC,
+};
+
+enum
+{
 	WALL = '#',
 	ROCK = '\'',
 	PIT = '^',
 	PLAYER = '@',
 	SPACE = ' ',
 };
+
 enum
 {
 	KB_UP = 'w',
@@ -35,7 +42,7 @@ enum
 	KB_QUIT = 'q',
 	KB_REFRESH = 'r',
 	KB_UNDO = 'u',
-	KB_REPLAY = 'R',
+	KB_AUTOMATION = 'M',
 };
 
 typedef struct MAP_LIST
@@ -46,6 +53,7 @@ typedef struct MAP_LIST
 
 } map_list;
 
+static int GAME_MODE;
 static int y, x;
 static int number_of_rocks_left;
 static map_list *map_list_head;
@@ -84,6 +92,7 @@ static void soukoban_init(char *filename)
 	initscr();
 	noecho();
 	cbreak();
+	GAME_MODE = MANUAL;
 	load_map(filename);
 	move(y, x);
 	map_list_head = map_list_tail = NULL;
@@ -234,8 +243,8 @@ static void soukoban_main_loop(char *filename)
 		case KB_UNDO:
 			undo_do();
 			break;
-		case KB_REPLAY:
-			// unimplemented yet
+		case KB_AUTOMATION:
+			GAME_MODE = AUTOMATIC;
 			break;
 		default:
 			break;
