@@ -1,63 +1,4 @@
-#include <curses.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <errno.h>
-#include <error.h>
-
-#define DEFAULT_DAT_FILENAME "soukoban.map"
-#define BUF_SIZE 1024
-#define MAXIMUM_UNDO_STEPS 3
-#define SAFE_FREE(ptr) \
-	{                  \
-		free(ptr);     \
-		ptr = NULL;    \
-	}
-
-enum
-{
-	MANUAL,
-	AUTOMATIC,
-};
-
-enum
-{
-	WALL = '#',
-	ROCK = '\'',
-	PIT = '^',
-	PLAYER = '@',
-	SPACE = ' ',
-};
-
-enum
-{
-	KB_UP = 'w',
-	KB_DOWN = 's',
-	KB_LEFT = 'a',
-	KB_RIGHT = 'd',
-	KB_UP2 = 'W',
-	KB_DOWN2 = 'S',
-	KB_LEFT2 = 'A',
-	KB_RIGHT2 = 'D',
-	KB_QUIT = 'q',
-	KB_REFRESH = 'r',
-	KB_UNDO = 'u',
-	KB_AUTOMATION = 'M',
-};
-
-typedef struct MAP_LIST
-{
-	struct MAP_LIST *prev;
-	struct MAP_LIST *next;
-	char **map;
-
-} map_list;
-
-static int GAME_MODE;
-static int y, x;
-static int number_of_rocks_left;
-static map_list *map_list_head;
-static map_list *map_list_tail;
+#include "include/common.h"
 
 static void soukoban_init(char *);
 static void soukoban_main_loop(char *);
@@ -68,9 +9,7 @@ static void dash(int, int);
 static void undo_save_progress(void);
 static void undo_do(void);
 static void replay(void);
-// --------in progress---------
 static void debug(void);
-// ----------------------------
 
 int main(int argc, char **argv)
 {
@@ -92,9 +31,10 @@ static void soukoban_init(char *filename)
 	initscr();
 	noecho();
 	cbreak();
+	player = (Player *)malloc(sizeof(Player));
 	GAME_MODE = MANUAL;
 	load_map(filename);
-	move(y, x);
+	move(player->y, player->x);
 	map_list_head = map_list_tail = NULL;
 	undo_save_progress;
 }
@@ -110,7 +50,7 @@ static void load_map(char *filename)
 		soukoban_end();
 	}
 
-	if (sscanf(buf, "y = %d, x = %d, rocks = %d", &y, &x, &number_of_rocks_left) == EOF)
+	if (sscanf(buf, "y = %d, x = %d, rocks = %d", &(player->y), &(player->x), &num_of_rocks) == EOF)
 	{
 		perror("sscanf");
 		soukoban_end();
@@ -126,14 +66,14 @@ static void load_map(char *filename)
 		printw("%s", buf);
 	}
 
-	mvprintw(LINES - 1, 0, "%d rock(s) left", number_of_rocks_left);
+	mvprintw(LINES - 1, 0, "%d rock(s) left", num_of_rocks);
 	fclose(fp);
 }
 
 static void soukoban_end(void)
 {
 	clear();
-	if (number_of_rocks_left == 0)
+	if (num_of_rocks == 0)
 	{
 		mvprintw(1, 1, "Finish!");
 		mvprintw(2, 1, "Type R-key to replay,");
@@ -155,7 +95,7 @@ static void step(int dy, int dx)
 	undo_save_progress();
 
 	chtype c;
-	int new_y = y + dy, new_x = x + dx;
+	int new_y = player->y + dy, new_x = player->x + dx;
 	move(new_y, new_x);
 	c = inch() & A_CHARTEXT;
 
@@ -165,7 +105,7 @@ static void step(int dy, int dx)
 	}
 	else if (c == ROCK)
 	{
-		move(y + dy + dy, x + dx + dx);
+		move(player->y + dy + dy, player->x + dx + dx);
 		char dist = inch() & A_CHARTEXT;
 		if (dist == WALL || dist == ROCK)
 		{
@@ -173,31 +113,31 @@ static void step(int dy, int dx)
 		}
 		else if (dist == PIT)
 		{
-			mvaddch(y + dy + dy, x + dx + dx, SPACE);
-			mvaddch(y + dy, x + dx, SPACE);
-			number_of_rocks_left--;
-			mvprintw(LINES - 1, 0, "%d rock(s) left", number_of_rocks_left);
+			mvaddch(player->y + dy + dy, player->x + dx + dx, SPACE);
+			mvaddch(player->y + dy, player->x + dx, SPACE);
+			num_of_rocks--;
+			mvprintw(LINES - 1, 0, "%d rock(s) left", num_of_rocks);
 		}
 		else if (dist == SPACE)
 		{
-			mvaddch(y + dy + dy, x + dx + dx, ROCK);
+			mvaddch(player->y + dy + dy, player->x + dx + dx, ROCK);
 		}
 	}
 
-	move(y, x);
+	move(player->y, player->x);
 	addch(SPACE);
-	y += dy;
-	x += dx;
-	mvaddch(y, x, PLAYER);
+	player->y += dy;
+	player->x += dx;
+	mvaddch(player->y, player->x, PLAYER);
 }
 
 static void dash(int dy, int dx)
 {
 	while (1)
 	{
-		int prev_y = y, prev_x = x;
+		int prev_y = player->y, prev_x = player->x;
 		step(dy, dx);
-		if (y == prev_y && x == prev_x)
+		if (player->y == prev_y && player->x == prev_x)
 		{
 			break;
 		}
@@ -209,7 +149,7 @@ static void soukoban_main_loop(char *filename)
 	int c;
 	refresh();
 
-	while (number_of_rocks_left != 0 && (c = getch()) != KB_QUIT)
+	while (num_of_rocks != 0 && (c = getch()) != KB_QUIT)
 	{
 		switch (c)
 		{
@@ -250,7 +190,7 @@ static void soukoban_main_loop(char *filename)
 			break;
 		}
 
-		move(y, x);
+		move(player->y, player->x);
 		// debug();
 		refresh();
 	}
@@ -288,7 +228,7 @@ static void undo_save_progress(void)
 		}
 	}
 
-	if (sprintf(currentMapList->map[0], "y=%d, x=%d, rocks=%d", y, x, number_of_rocks_left) < 0)
+	if (sprintf(currentMapList->map[0], "y=%d, x=%d, rocks=%d", player->y, player->x, num_of_rocks) < 0)
 	{
 		perror("sprintf");
 		soukoban_end();
@@ -327,7 +267,7 @@ static void undo_do(void)
 		return;
 	}
 
-	if (sscanf(map_list_tail->map[0], "y = %d, x = %d, rocks = %d", &y, &x, &number_of_rocks_left) == EOF)
+	if (sscanf(map_list_tail->map[0], "y = %d, x = %d, rocks = %d", &(player->y), &(player->x), &num_of_rocks) == EOF)
 	{
 		perror("sscanf");
 		soukoban_end();
