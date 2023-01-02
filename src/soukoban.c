@@ -1,48 +1,45 @@
 #include "include/common.h"
 
-static void soukoban_init(char *);
-static void soukoban_main_loop(char *);
-static void soukoban_end(void);
-static void load_map(char *);
-static void step(int, int);
-static void dash(int, int);
-static void undo_save_progress(void);
-static void undo_do(void);
-static void replay(void);
-static void debug(void);
-
 int main(int argc, char **argv)
 {
-	char *filename = DEFAULT_DAT_FILENAME;
+	char *MAP_FILE = DEFAULT_DAT_FILENAME;
 	if (argc >= 2)
 	{
-		filename = argv[1];
+		MAP_FILE = argv[1];
 	}
 
-	soukoban_init(filename);
-	soukoban_main_loop(filename);
+	soukoban_init(MAP_FILE);
+	soukoban_main_loop(MAP_FILE);
 	soukoban_end();
 
 	return 0;
 }
 
-static void soukoban_init(char *filename)
+void soukoban_init(char *filename)
 {
 	initscr();
 	noecho();
 	cbreak();
+	curs_set(0);
 	player = (Player *)malloc(sizeof(Player));
 	GAME_MODE = MANUAL;
 	load_map(filename);
 	move(player->y, player->x);
 	map_list_head = map_list_tail = NULL;
-	undo_save_progress;
+	undo_save_progress();
 }
 
-static void load_map(char *filename)
+void load_map(char *filename)
 {
 	char buf[BUF_SIZE];
+
 	FILE *fp = fopen(filename, "r");
+	if (!fp)
+	{
+		perror("fopen");
+		soukoban_end();
+		exit(EXIT_FAILURE);
+	}
 
 	if (fgets(buf, sizeof(buf), fp) == NULL && ferror(fp) != 0)
 	{
@@ -70,7 +67,7 @@ static void load_map(char *filename)
 	fclose(fp);
 }
 
-static void soukoban_end(void)
+void soukoban_end(void)
 {
 	clear();
 	if (num_of_rocks == 0)
@@ -89,7 +86,7 @@ static void soukoban_end(void)
 	endwin();
 }
 
-static void step(int dy, int dx)
+void step(int dy, int dx)
 {
 	// save current map
 	undo_save_progress();
@@ -131,7 +128,7 @@ static void step(int dy, int dx)
 	mvaddch(player->y, player->x, PLAYER);
 }
 
-static void dash(int dy, int dx)
+void dash(int dy, int dx)
 {
 	while (1)
 	{
@@ -144,7 +141,7 @@ static void dash(int dy, int dx)
 	}
 }
 
-static void soukoban_main_loop(char *filename)
+void soukoban_main_loop(char *filename)
 {
 	int c;
 	refresh();
@@ -185,6 +182,7 @@ static void soukoban_main_loop(char *filename)
 			break;
 		case KB_AUTOMATION:
 			GAME_MODE = AUTOMATIC;
+			autoresolve();
 			break;
 		default:
 			break;
@@ -196,7 +194,7 @@ static void soukoban_main_loop(char *filename)
 	}
 }
 
-static void undo_save_progress(void)
+void undo_save_progress(void)
 {
 	// copy current map
 	map_list *currentMapList = (map_list *)malloc(sizeof(map_list));
@@ -260,7 +258,7 @@ static void undo_save_progress(void)
 	}
 }
 
-static void undo_do(void)
+void undo_do(void)
 {
 	if (!map_list_head || !map_list_tail)
 	{
@@ -284,7 +282,7 @@ static void undo_do(void)
 	SAFE_FREE(formerTail);
 }
 
-static void replay(void)
+void replay(void)
 {
 	clear();
 	map_list *currentMapList = map_list_head;
@@ -302,7 +300,7 @@ static void replay(void)
 	}
 }
 
-static void debug()
+void debug()
 {
 	if (!map_list_tail)
 	{

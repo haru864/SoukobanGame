@@ -1,0 +1,1 @@
+/usr/bin/cc CMakeFiles/soukoban.dir/soukoban.c.o CMakeFiles/soukoban.dir/autoresolve.c.o -o soukoban  -lcurses /usr/lib/x86_64-linux-gnu/libform.so 
