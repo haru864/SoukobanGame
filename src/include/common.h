@@ -74,42 +74,19 @@ typedef struct PassingPoints
 {
 	coord *head;
 	coord *tail;
+	char **map;
+	int rock;
+	coord location;
 	void (*push)(struct PassingPoints *);
 	void (*pop)(struct PassingPoints *);
 } passing_points;
 
-static Player *player;
-static int GAME_MODE;
-static int num_of_rocks;
-static map_list *map_list_head;
-static map_list *map_list_tail;
-
-static void push(passing_points *passingPoints)
-{
-	if (passingPoints->head == NULL || passingPoints->tail == NULL)
-	{
-		return;
-	}
-}
-
-static void pop(passing_points *passingPoints)
-{
-	if (passingPoints->head == NULL || passingPoints->tail == NULL)
-	{
-		return;
-	}
-
-	if (passingPoints->head == passingPoints->tail)
-	{
-		SAFE_FREE(passingPoints->head);
-		passingPoints->head = passingPoints->tail = NULL;
-		return;
-	}
-
-	coord *nextTail = passingPoints->tail->prev;
-	SAFE_FREE(passingPoints->tail);
-	passingPoints->tail = nextTail;
-}
+// declared in soukoban.c
+extern Player *player;
+extern int GAME_MODE;
+extern int num_of_rocks;
+extern map_list *map_list_head;
+extern map_list *map_list_tail;
 
 // soukoban functions
 void soukoban_init(char *);
@@ -124,7 +101,6 @@ void replay(void);
 void debug(void);
 
 // autoresolve functions
-void init_autoresolve(void);
-void printScreen(char **);
+void autoresolve();
 
 #endif

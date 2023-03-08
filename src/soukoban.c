@@ -1,5 +1,11 @@
 #include "include/common.h"
 
+Player *player;
+int GAME_MODE;
+int num_of_rocks;
+map_list *map_list_head;
+map_list *map_list_tail;
+
 int main(int argc, char **argv)
 {
 	char *MAP_FILE = DEFAULT_DAT_FILENAME;
